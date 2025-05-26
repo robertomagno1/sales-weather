@@ -9,8 +9,6 @@ CREATE CONSTRAINT weather_key IF NOT EXISTS FOR (w:Weather) REQUIRE (w.city, w.d
 
 
 
-
-
 ####1
 
 
@@ -235,7 +233,6 @@ RETURN weather,
        row.product AS product_name,
        round(row.sales, 2) AS total_sales
 ORDER BY weather, total_sales DESC;
-
 
 
 
