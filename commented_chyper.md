@@ -1,5 +1,4 @@
-## Blocks 0 – 4 ▪ Cypher script **with in‐place, numbered commentary**  
-*(copy–paste this single cell into your `.md` notes)*
+
 
 
 ```cypher
