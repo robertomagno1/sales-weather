@@ -111,12 +111,12 @@ ORDER BY region, avg_sales DESC;                    // ⑤ ranked output
 What the query reveals
 Example: in the West region, San Francisco averages $486 per order while Phoenix averages $215—insightful for region-specific marketing or inventory decisions.
 
-① MATCH …	Traverses the Region → State → City chain (two hops) and then follows DELIVERED_TO to every order delivered in each city.
- Each hop is index-backed thanks to the unique constraints defined in Block 0, so the pattern is resolved with index-seeks, not label scans.
-② r.name AS region	Emits the region name; implicit GROUP BY will aggregate on (region, city).
-③ c.name AS city	Emits the city inside its parent region, producing one result row per city.
-④ avg(o.sales)	Calculates the arithmetic mean of sales for all orders in that city. round(…,2) formats the number for presentation without altering stored precision.
-⑤ ORDER BY region, avg_sales DESC	First sorts alphabetically by region, then ranks cities inside each region from highest to lowest average sale value—making revenue “hot-spots”
+# MATCH …	Traverses the Region → State → City chain (two hops) and then follows DELIVERED_TO to every order delivered in each city.
+Each hop is index-backed thanks to the unique constraints defined in Block 0, so the pattern is resolved with index-seeks, not label scans.
+# r.name AS region	Emits the region name; implicit GROUP BY will aggregate on (region, city).
+# c.name AS city	Emits the city inside its parent region, producing one result row per city.
+# avg(o.sales)	Calculates the arithmetic mean of sales for all orders in that city. round(…,2) formats the number for presentation without altering stored precision.
+# ORDER BY region, avg_sales DESC	First sorts alphabetically by region, then ranks cities inside each region from highest to lowest average sale value—making revenue “hot-spots”
  obvious during the demo.
 
 
