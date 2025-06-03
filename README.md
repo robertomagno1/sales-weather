@@ -1,102 +1,130 @@
-# 🌦️ Sales & Weather Analysis Project.
-An SQL project to analyze the impact of weather on sales by integrating sales and weather data into a single optimized pipeline.
+ 🌦️ Sales & Weather Analysis Project
 
-
-
----
-
-## 📌 Project goals.
-
-- Integrate heterogeneous data (sales and weather) into a single relational database.
-- Optimize SQL table structure with constraints and indexes.
-- Perform advanced analysis on sales conditioned by weather parameters (temperature, humidity, weather conditions).
-- Develop complex SQL queries (JOIN, nested, aggregations, multiple conditions).
+An advanced SQL + NoSQL (Neo4j) project analyzing how weather affects sales by integrating two datasets in both **relational** and **graph-based** architectures.
 
 ---
 
-## 🛠️ Technologies used.
+## 📌 Project Goals
 
-- *SQL* (ANSI standard, tested on PostgreSQL and SQLite)
-- *DBMS* (PostgreSQL, SQLite or other compatible)
-- *Optional tools*: DBeaver, pgAdmin, SQLite Browser, Jupyter (for integrated execution via Python-SQL)
-
----
-
-## 📁 Project structure
-
-
-
-
-               # sql modules for the function used in the main 
-
-	├──  📜 00_create_tables.sql # Create raw tables of sales and weather
- 	├──  📜 01_create_view_weather.sql # Create combined view of weather data
- 	├── 📜 02_join_weather_sales.sql # Join weather data and sales
- 	├── 📜 03_clean_optimized_table.sql # Create clean table with indexes and constraints
- 	├── 📜 04_queries.sql # Advanced analysis queries.
- 	├──  📜 README_queries.md # Detailed explanations queries 11-19
-	├── 📜 README.md # This file.
-        	
-	├── .gitignore            # Git ignore file for excluding unnecessary files
-	├── README.md             # Project documentation
-	└── 📜 schema_diagram.png # (optional) ER diagram of tables.
-
-
+- Integrate heterogeneous data (sales and weather) into both relational and graph databases.
+- Compare SQL (PostgreSQL/SQLite) and NoSQL (Neo4j) solutions.
+- Optimize data loading and structure (constraints, indexes).
+- Perform complex queries: sales trends under weather conditions, geolocation-aware analysis, customer/product performance.
 
 ---
 
-## 🧭 Step-by-Step - How to explore the project.
+## 🧱 Technologies Used
 
-### 🔹 1. *Create tables*
-Run 00_create_tables.sql to generate tables:
-- orders_raw
-- temperature
-- humidity
-- description
-
-### 🔹 2. *Create weather view*
-Run 01_create_view_weather.sql to get combined_weather , a view that combines temperature, humidity, and description by date and time.
-
-### 🔹 3. *Join between weather and sales*.
-Run 02_join_weather_sales.sql to merge sales data with weather data.
-
-### 🔹 4. *Cleaning and optimization*
-Run 03_clean_optimized_table.sql to create sales_weather_clean , with:
-- primary/external key constraints
-- indexes on join columns
-- standardized data
-
-### 🔹 5. *Advanced analyses*
-Run 04_queries.sql to explore:
-- sales patterns under specific weather conditions
-- average sales by temperature/humidity band
-- correlations between weather and order volume
-- nested queries, aggregations, subqueries
-
-	✏️ See README_queries.md for detailed explanations of queries 11 through 19.
+| Layer            | Technology        |
+|------------------|-------------------|
+| Relational DB     | SQL (PostgreSQL, SQLite) |
+| Graph DB          | Neo4j (Cypher) |
+| Data Tools        | CSV (weather, sales), DBeaver, Neo4j Desktop |
+| Optional Interface | Jupyter (SQL + Python), pgAdmin, SQLite Browser |
 
 ---
 
-## 📈 Expected Results.
+## 📂 Project Structure
 
-- Identification of weather patterns that influence sales.
-- Efficient and well-structured database.
-- Advanced queries executable in optimal time even on medium to large datasets.
+### 📁 `sql/` - Relational Version
+```
+├── 00_create_tables.sql          # Create raw tables of sales and weather
+├── 01_create_view_weather.sql    # Create weather view
+├── 02_join_weather_sales.sql     # Join and merge datasets
+├── 03_clean_optimized_table.sql  # Create optimized clean table
+├── 04_queries.sql                # Final SQL analysis queries
+├── README_queries.md             # Explanations of advanced SQL queries
+```
+
+### 📁 `neo4j/` - Graph Version (Assignment 3)
+```
+├── query_cypher.rtf              # Cypher scripts: constraints, data import, queries
+├── Neo4j-ExamplesInSlides.txt    # Sample Cypher syntax from class slides
+├── sales_final.csv               # Sales data
+├── weather_final.csv             # Weather data
+├── humidity.csv / temperature.csv / description.csv
+```
+
+---
+
+## 🧭 Step-by-Step Execution
+
+### 🔸 **Relational DB (SQL)**
+
+1. Create tables (`00_create_tables.sql`)
+2. Generate weather view (`01_create_view_weather.sql`)
+3. Join datasets (`02_join_weather_sales.sql`)
+4. Optimize & clean (`03_clean_optimized_table.sql`)
+5. Run analytical queries (`04_queries.sql`)
+
+### 🔸 **Graph DB (Neo4j)**
+
+1. Setup constraints and unique keys (`query_cypher.rtf`, section 0)
+2. Load sales data, create hierarchy: Region → State → City → Customer/Product/Order
+3. Load weather data from `description.csv`, `temperature.csv`, `humidity.csv`
+4. Update weather node properties (temperature, humidity)
+5. Run graph queries (`query_cypher.rtf`, Q1–Q10):
+   - Avg temp/humidity by city
+   - Regional sales/profit
+   - High sales on sunny days
+   - Customer/product insights based on weather
+   - Monthly/seasonal trends
+
+---
+
+## 📊 Example Cypher Queries
+
+```cypher
+// Average temperature & humidity per city
+MATCH (c:City)-[:HAS_WEATHER]->(w:Weather)
+RETURN c.name AS city, avg(w.temperature) AS avg_temp, avg(w.humidity) AS avg_humidity;
+```
+
+```cypher
+// Top 5 selling products on sunny days
+MATCH (o:Order)-[:CONTAINS]->(p:Product),
+      (o)-[:DELIVERED_TO]->(c:City)-[:HAS_WEATHER]->(w:Weather)
+WHERE w.date = o.date AND w.description CONTAINS "sky is clear"
+WITH w.description AS weather, p.name AS product, sum(o.sales) AS sales_total
+ORDER BY weather, sales_total DESC
+WITH weather, collect({product: product, sales: sales_total})[0..5] AS top5
+UNWIND top5 AS row
+RETURN weather, row.product AS product_name, row.sales AS total_sales;
+```
+
+---
+
+## 🧠 Key Learning Outcomes
+
+| SQL                                 | Neo4j (Graph DB)                             |
+|-------------------------------------|----------------------------------------------|
+| Rigid schema, JOINs for relations   | Schema-less, explicit relationships          |
+| Slower for recursive traversals     | Fast path traversal with O(1) hops           |
+| Complex aggregation via GROUP BY    | Ad-hoc aggregation using pattern matching    |
+| Less flexible to schema changes     | Easy to expand (add properties, labels, rels)|
+
+---
+
+## 🧪 Performance Insights
+
+- Relational joins become heavy in deep multi-level aggregations.
+- Neo4j is significantly faster for path-based and recursive queries (e.g., weather → city → order → product).
+- Neo4j shows higher flexibility and better expression for “real-world” relationships like weather impact on customer behavior.
 
 ---
 
 ## 📬 Contacts
 
-For questions or input:
-- GitHub issues
-- https://github.com/robertomagno1 
-- https://github.com/JacopoCaldana
+- [GitHub: Roberto Magno](https://github.com/robertomagno1)
+- [GitHub: Jacopo Caldana](https://github.com/JacopoCaldana)
 
 ---
 
-## 🐣 Happy Easter and happy work!  
-Thank you for exploring this project 🌱
+## 🎉 Final Note
 
+This project demonstrates how **SQL and Graph DBs can complement each other**, highlighting the trade-offs between relational integrity and graph-based expressiveness.
+
+Happy querying! 🚀🌤️
 
 
 
