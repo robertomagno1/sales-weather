@@ -1,131 +1,93 @@
- 🌦️ Sales & Weather Analysis Project
+# Sales × Weather — Relational Data Model in MySQL (+ Neo4j comparison)
 
-An advanced SQL + NoSQL (Neo4j) project analyzing how weather affects sales by integrating two datasets in both **relational** and **graph-based** architectures.
+End-to-end relational engineering project: integrating retail order lines with daily
+weather observations in a **MySQL 8** database designed from scratch — schema design,
+constraints, ETL, data-quality checks and query optimisation — with the same model
+replicated in **Neo4j** to compare relational and graph access paths.
 
----
-
-## 📌 Project Goals
-
-- Integrate heterogeneous data (sales and weather) into both relational and graph databases.
-- Compare SQL (PostgreSQL/SQLite) and NoSQL (Neo4j) solutions.
-- Optimize data loading and structure (constraints, indexes).
-- Perform complex queries: sales trends under weather conditions, geolocation-aware analysis, customer/product performance.
+Team of two: [Roberto Magno Mazzotta](https://github.com/robertomagno1) ·
+[Jacopo Caldana](https://github.com/JacopoCaldana)
 
 ---
 
-## 🧱 Technologies Used
+## Data
 
-| Layer            | Technology        |
-|------------------|-------------------|
-| Relational DB     | SQL (PostgreSQL, SQLite) |
-| Graph DB          | Neo4j (Cypher) |
-| Data Tools        | CSV (weather, sales), DBeaver, Neo4j Desktop |
-| Optional Interface | Jupyter (SQL + Python), pgAdmin, SQLite Browser |
+| Source | Grain | Volume |
+|---|---|---|
+| `Sample - Superstore.csv` | one row per order line (`order_id` + `product_id`) | 9,994 rows, 21 columns |
+| `temperature1.csv`, `humidity.csv`, `description.csv` | one row per city–day | 67,932 rows each, 36 cities, 2012-10-01 → 2017-11-30 |
 
----
+## Data model
 
-## 📂 Project Structure
+- **Weather tables** (`temperature`, `humidity`, `description`): composite primary key
+  `(date, city)` — the measurement is unique per city-day, so no surrogate key is needed —
+  plus secondary indexes on `city` and `date`.
+- **Staging** (`orders_raw`): loaded verbatim, dates kept as strings, then parsed explicitly
+  with `STR_TO_DATE(order_date, '%d/%m/%y')`.
+- **Integration**: `weather_condition` joins the three measures on `(date, city)`;
+  `sales_weather` joins orders to weather on parsed date **and** city.
+- **Target table** (`sales_weather_clean`): typed columns (`DATE`, `DECIMAL`), `NOT NULL`
+  on keys, `CHECK (quantity > 0)` and `CHECK (discount BETWEEN 0 AND 1)`, and seven
+  secondary indexes on the columns used for filtering and grouping.
+- `order_id` is deliberately **not** a primary key: one order with three items produces
+  three rows. The grain is the order line — documented in `sql/04_clean_model_and_quality.sql`.
 
-### 📁 `sql/` - Relational Version
+## Data quality
+
+Duplicate-key check on `row_id` (2 duplicates found), NULL check on identifiers, explicit
+date parsing instead of implicit casts, and a documented rationale for every constraint.
+
+## Query optimisation
+
+`EXPLAIN ANALYZE` on the regional averages filtered by `weather_description` showed a
+poorly selective index scan: **3,616 rows read to keep 1,563 (~43%)**. Two indexes were
+added — a composite `(weather_description, region)` covering both the `WHERE` and the
+`GROUP BY`, and a covering variant `(weather_description, region, sales)` that also
+carries the aggregated column. Separately, the typed and indexed target table **halved a
+full-table read (0.15 s → 0.08 s)** compared with the untyped join table.
+
+> Timings were measured locally with `EXPLAIN ANALYZE`; they are indicative, not a
+> controlled benchmark.
+
+## Analytics
+
+19 analytical queries (`sql/03_*`, `sql/05_*`): weather distributions per city, regional
+sales and profit, customer profitability against the regional average, product and
+sub-category performance conditioned on weather, and rankings built with
+`RANK() OVER (PARTITION BY ...)`.
+
+## Repository layout
+
 ```
-├── 00_create_tables.sql          # Create raw tables of sales and weather
-├── 01_create_view_weather.sql    # Create weather view
-├── 02_join_weather_sales.sql     # Join and merge datasets
-├── 03_clean_optimized_table.sql  # Create optimized clean table
-├── 04_queries.sql                # Final SQL analysis queries
-├── README_queries.md             # Explanations of advanced SQL queries
-```
-
-### 📁 `neo4j/` - Graph Version (Assignment 3)
-```
-├── query_cypher.rtf              # Cypher scripts: constraints, data import, queries
-├── Neo4j-ExamplesInSlides.txt    # Sample Cypher syntax from class slides
-├── sales_final.csv               # Sales data
-├── weather_final.csv             # Weather data
-├── humidity.csv / temperature.csv / description.csv
-```
-
----
-
-## 🧭 Step-by-Step Execution
-
-### 🔸 **Relational DB (SQL)**
-
-1. Create tables (`00_create_tables.sql`)
-2. Generate weather view (`01_create_view_weather.sql`)
-3. Join datasets (`02_join_weather_sales.sql`)
-4. Optimize & clean (`03_clean_optimized_table.sql`)
-5. Run analytical queries (`04_queries.sql`)
-
-### 🔸 **Graph DB (Neo4j)**
-
-1. Setup constraints and unique keys (`query_cypher.rtf`, section 0)
-2. Load sales data, create hierarchy: Region → State → City → Customer/Product/Order
-3. Load weather data from `description.csv`, `temperature.csv`, `humidity.csv`
-4. Update weather node properties (temperature, humidity)
-5. Run graph queries (`query_cypher.rtf`, Q1–Q10):
-   - Avg temp/humidity by city
-   - Regional sales/profit
-   - High sales on sunny days
-   - Customer/product insights based on weather
-   - Monthly/seasonal trends
-
----
-
-## 📊 Example Cypher Queries
-
-```cypher
-// Average temperature & humidity per city
-MATCH (c:City)-[:HAS_WEATHER]->(w:Weather)
-RETURN c.name AS city, avg(w.temperature) AS avg_temp, avg(w.humidity) AS avg_humidity;
+sql/
+  01_schema.sql                  staging table, weather tables, PKs and indexes
+  02_etl_join.sql                weather view and the date-parsed sales × weather join
+  03_analytics_core.sql          Q1–Q10
+  04_clean_model_and_quality.sql typed target table, constraints, indexes, DQ checks
+  05_analytics_weather.sql       Q11–Q19
+  06_query_optimization.sql      EXPLAIN ANALYZE, composite and covering indexes
+neo4j/
+  graph_model.cypher             uniqueness constraints, Region→State→City→Order/Product
+  queries_commented.md           Q1–Q10 in Cypher, commented
+dataset/                         source CSVs
+docs/report_it.docx              original project report (Italian)
 ```
 
-```cypher
-// Top 5 selling products on sunny days
-MATCH (o:Order)-[:CONTAINS]->(p:Product),
-      (o)-[:DELIVERED_TO]->(c:City)-[:HAS_WEATHER]->(w:Weather)
-WHERE w.date = o.date AND w.description CONTAINS "sky is clear"
-WITH w.description AS weather, p.name AS product, sum(o.sales) AS sales_total
-ORDER BY weather, sales_total DESC
-WITH weather, collect({product: product, sales: sales_total})[0..5] AS top5
-UNWIND top5 AS row
-RETURN weather, row.product AS product_name, row.sales AS total_sales;
+## Relational vs graph
+
+The Neo4j layer models the same facts as `Region → State → City → {Customer, Product, Order}`
+with `HAS_WEATHER` edges. It expresses path queries more directly and avoids repeated joins
+on the geographic hierarchy; the relational model remains stronger for column-wise
+aggregation over the full fact table, which is what most of the analytical questions here
+actually need.
+
+## Reproduce
+
+```bash
+mysql -u <user> -p < sql/01_schema.sql   # then load dataset/*.csv into the staging tables
+mysql -u <user> -p sales_data < sql/02_etl_join.sql
+mysql -u <user> -p sales_data < sql/04_clean_model_and_quality.sql
+mysql -u <user> -p sales_data < sql/06_query_optimization.sql
 ```
 
----
-
-## 🧠 Key Learning Outcomes
-
-| SQL                                 | Neo4j (Graph DB)                             |
-|-------------------------------------|----------------------------------------------|
-| Rigid schema, JOINs for relations   | Schema-less, explicit relationships          |
-| Slower for recursive traversals     | Fast path traversal with O(1) hops           |
-| Complex aggregation via GROUP BY    | Ad-hoc aggregation using pattern matching    |
-| Less flexible to schema changes     | Easy to expand (add properties, labels, rels)|
-
----
-
-## 🧪 Performance Insights
-
-- Relational joins become heavy in deep multi-level aggregations.
-- Neo4j is significantly faster for path-based and recursive queries (e.g., weather → city → order → product).
-- Neo4j shows higher flexibility and better expression for “real-world” relationships like weather impact on customer behavior.
-
----
-
-## 📬 Contacts
-
-- [GitHub: Roberto Magno](https://github.com/robertomagno1)
-- [GitHub: Jacopo Caldana](https://github.com/JacopoCaldana)
-
----
-
-## 🎉 Final Note
-
-This project demonstrates how **SQL and Graph DBs can complement each other**, highlighting the trade-offs between relational integrity and graph-based expressiveness.
-
-Happy querying! 🚀🌤️
-
-
-
-
+Built for the Databases & Big Data course, Sapienza University of Rome.
